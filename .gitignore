@@ -1,0 +1,39 @@
+# Python-specific ignores
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Dependency directories
+site-packages/
+lib/
+lib64/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Saved scenario files (optional)
+*.json
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# Dependency lock files (if you use pipenv or poetry)
+Pipfile.lock
+poetry.lock
