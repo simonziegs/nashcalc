@@ -42,7 +42,7 @@ python nashcalc_v1.py
 ```
 ## Usage
 Set Moves:
-- Use the spin boxes to define the number of attacker and defender moves (minimum 2, maximum 15).
+- Use the spin boxes to define the number of attacker and defender moves (maximum 15).
 
 - Edit move names in the "Move Names" section.
 
