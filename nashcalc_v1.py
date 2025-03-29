@@ -42,7 +42,13 @@ class NashCalculatorGUI:
         
         self.matrix_frame = ttk.LabelFrame(self.input_frame, text="Payoff Matrix", padding="5")
         self.matrix_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky="nsew")
-        
+        # Threshold spinbox
+        ttk.Label(self.input_frame, text="Simplification Threshold (%):").grid(row=5, column=0, padx=5, pady=5)
+        self.threshold_spinbox = tk.Spinbox(self.input_frame, from_=0, to=20, increment=1, width=5)
+        self.threshold_spinbox.grid(row=5, column=1, padx=5, pady=5)
+        self.threshold_spinbox.delete(0, tk.END)
+        self.threshold_spinbox.insert(0, "10")  # Default to 10%
+            
         button_frame = ttk.Frame(self.input_frame)
         button_frame.grid(row=4, column=0, columnspan=2, pady=10)
         ttk.Button(button_frame, text="Calculate Nash", command=self.calculate).grid(row=0, column=0, padx=5)
@@ -51,6 +57,8 @@ class NashCalculatorGUI:
         ttk.Button(button_frame, text="Save Scenario", command=self.save_scenario).grid(row=0, column=3, padx=5)
         ttk.Button(button_frame, text="Load Scenario", command=self.load_scenario).grid(row=0, column=4, padx=5)
         ttk.Button(button_frame, text="Make Binary", command=self.make_binary).grid(row=0, column=5, padx=5)
+        ttk.Button(button_frame, text="Simplify Attacker", command=self.simplify_attacker_strategy).grid(row=0, column=6, padx=5)
+        ttk.Button(button_frame, text="Simplify Defender", command=self.simplify_defender_strategy).grid(row=0, column=7, padx=5)
         
         self.attacker_entries = []
         self.defender_entries = []
@@ -76,6 +84,185 @@ class NashCalculatorGUI:
         
         self.result_frame.columnconfigure(0, weight=1)
         self.result_frame.rowconfigure(1, weight=1)
+
+    def compute_nash_for_subset(self, payoff_matrix, attacker_subset=None, defender_subset=None):
+        """Compute Nash equilibrium for a subset of attacker and/or defender moves."""
+        n_attacker, n_defender = payoff_matrix.shape
+        if attacker_subset is None:
+            attacker_subset = list(range(n_attacker))
+        if defender_subset is None:
+            defender_subset = list(range(n_defender))
+    
+        # Extract submatrix
+        sub_matrix = payoff_matrix[np.ix_(attacker_subset, defender_subset)]
+        attacker_moves = [self.attacker_entries[i].get() for i in attacker_subset]
+        defender_moves = [self.defender_entries[j].get() for j in defender_subset]
+    
+        # Compute Nash equilibrium for submatrix
+        result = self.calculate_mixed_nash(attacker_moves, defender_moves, sub_matrix)
+        if isinstance(result, str):
+            return None, None, None  # Error occurred
+        return result[2], result[3], result[4]  # Attacker probs, defender probs, EV
+    
+    def simplify_attacker_strategy(self):
+        """Simplify attacker's strategy while keeping EV >= (100% - threshold%) of original EV."""
+        try:
+            # Get threshold from spinbox
+            threshold_percent = float(self.threshold_spinbox.get())
+            lower_threshold_factor = 1 - (threshold_percent / 100)
+            
+            # Get original game data
+            attacker_moves = [entry.get() for entry in self.attacker_entries]
+            defender_moves = [entry.get() for entry in self.defender_entries]
+            n_attacker = len(attacker_moves)
+            n_defender = len(defender_moves)
+            payoffs = [float(entry.get()) for entry in self.payoff_entries]
+            payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
+            
+            # Compute full Nash equilibrium
+            nash_result = self.calculate_mixed_nash(attacker_moves, defender_moves, payoff_matrix)
+            if isinstance(nash_result, str):
+                raise ValueError("Cannot compute full Nash equilibrium")
+            original_ev = nash_result[4]
+            lower_threshold = lower_threshold_factor * original_ev
+            
+            # Start with all attacker moves
+            current_subset = list(range(n_attacker))
+            
+            # Greedy simplification loop
+            while True:
+                best_ev = -float('inf')
+                best_subset = None
+                for i in current_subset:
+                    test_subset = [x for x in current_subset if x != i]
+                    if len(test_subset) == 0:  # Prevent removing all moves
+                        continue
+                    a_probs, d_probs, ev = self.compute_nash_for_subset(payoff_matrix, test_subset, None)
+                    if ev is not None and ev > best_ev:
+                        best_ev = ev
+                        best_subset = test_subset
+                if best_subset is None or best_ev < lower_threshold:
+                    break
+                current_subset = best_subset
+            
+            # Compute final simplified strategy
+            a_probs, d_probs, simplified_ev = self.compute_nash_for_subset(payoff_matrix, current_subset, None)
+            if a_probs is None:
+                raise ValueError("Failed to compute simplified strategy")
+            
+            # Prepare result
+            simplified_moves = [attacker_moves[i] for i in current_subset]
+            result = (simplified_moves, defender_moves, a_probs, d_probs, simplified_ev)
+            self.display_simplified_result(result, "attacker", original_ev)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to simplify attacker strategy: {str(e)}")
+
+    def simplify_defender_strategy(self):
+        """Simplify defender's strategy while keeping EV <= (100% + threshold%) of original EV."""
+        try:
+            # Get threshold from spinbox
+            threshold_percent = float(self.threshold_spinbox.get())
+            upper_threshold_factor = 1 + (threshold_percent / 100)
+            
+            # Get original game data
+            attacker_moves = [entry.get() for entry in self.attacker_entries]
+            defender_moves = [entry.get() for entry in self.defender_entries]
+            n_attacker = len(attacker_moves)
+            n_defender = len(defender_moves)
+            payoffs = [float(entry.get()) for entry in self.payoff_entries]
+            payoff_matrix = np.array(payoffs).reshape(n_attacker, n_defender)
+            
+            # Compute full Nash equilibrium
+            nash_result = self.calculate_mixed_nash(attacker_moves, defender_moves, payoff_matrix)
+            if isinstance(nash_result, str):
+                raise ValueError("Cannot compute full Nash equilibrium")
+            original_ev = nash_result[4]
+            upper_threshold = upper_threshold_factor * original_ev
+            
+            # Start with all defender moves
+            current_subset = list(range(n_defender))
+            
+            # Greedy simplification loop
+            while True:
+                best_ev = float('inf')
+                best_subset = None
+                for j in current_subset:
+                    test_subset = [x for x in current_subset if x != j]
+                    if len(test_subset) == 0:  # Prevent removing all moves
+                        continue
+                    a_probs, d_probs, ev = self.compute_nash_for_subset(payoff_matrix, None, test_subset)
+                    if ev is not None and ev < best_ev:
+                        best_ev = ev
+                        best_subset = test_subset
+                if best_subset is None or best_ev > upper_threshold:
+                    break
+                current_subset = best_subset
+            
+            # Compute final simplified strategy
+            a_probs, d_probs, simplified_ev = self.compute_nash_for_subset(payoff_matrix, None, current_subset)
+            if d_probs is None:
+                raise ValueError("Failed to compute simplified strategy")
+            
+            # Prepare result
+            simplified_moves = [defender_moves[j] for j in current_subset]
+            result = (attacker_moves, simplified_moves, a_probs, d_probs, simplified_ev)
+            self.display_simplified_result(result, "defender", original_ev)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to simplify defender strategy: {str(e)}")
+
+    def display_simplified_result(self, result, player, original_ev):
+        """Display the simplified strategy result with sorted strategies and moves reduced."""
+        attacker_moves, defender_moves, attacker_probs, defender_probs, simplified_ev = result
+        self.result_text.delete(1.0, tk.END)
+        
+        # Title based on the player being simplified
+        title = f"Simplified {'Attacker' if player == 'attacker' else 'Defender'} Strategy"
+        self.result_text.insert(tk.END, f"{title}\n\n", "title")
+        
+        # Sort attacker strategies by probability (descending)
+        attacker_data = sorted(zip(attacker_moves, attacker_probs), key=lambda x: x[1], reverse=True)
+        sorted_attacker_moves, sorted_attacker_probs = zip(*attacker_data)
+        
+        self.result_text.insert(tk.END, "Attacker Strategies (Sorted by Frequency):\n", "header")
+        max_move_len = max(len(move) for move in sorted_attacker_moves)
+        for move, prob in zip(sorted_attacker_moves, sorted_attacker_probs):
+            formatted_move = f"{move:<{max_move_len}}"
+            tag = "value_active" if prob > 0 else "value_inactive"
+            self.result_text.insert(tk.END, f"  {formatted_move}: ", "item")
+            self.result_text.insert(tk.END, f"{100*prob:6.2f}%\n", tag)
+        self.result_text.insert(tk.END, "\n")
+        
+        # Sort defender strategies by probability (descending)
+        defender_data = sorted(zip(defender_moves, defender_probs), key=lambda x: x[1], reverse=True)
+        sorted_defender_moves, sorted_defender_probs = zip(*defender_data)
+        
+        self.result_text.insert(tk.END, "Defender Strategies (Sorted by Frequency):\n", "header")
+        max_move_len = max(len(move) for move in sorted_defender_moves)
+        for move, prob in zip(sorted_defender_moves, sorted_defender_probs):
+            formatted_move = f"{move:<{max_move_len}}"
+            tag = "value_active" if prob > 0 else "value_inactive"
+            self.result_text.insert(tk.END, f"  {formatted_move}: ", "item")
+            self.result_text.insert(tk.END, f"{100*prob:6.2f}%\n", tag)
+        self.result_text.insert(tk.END, "\n")
+        
+        # EV information
+        self.result_text.insert(tk.END, "Expected Payoff (Attacker’s Perspective):\n", "header")
+        self.result_text.insert(tk.END, f"  Original EV: {original_ev:6.4f}\n", "item")
+        self.result_text.insert(tk.END, f"  Simplified EV: {simplified_ev:6.4f}\n", "value_active")
+        percent_retained = (simplified_ev / original_ev) * 100
+        self.result_text.insert(tk.END, f"  EV Retained: {percent_retained:.2f}%\n", "item")
+        
+        # Moves reduced
+        original_n_attacker = len(self.attacker_entries)
+        original_n_defender = len(self.defender_entries)
+        if player == "attacker":
+            simplified_n = len(attacker_moves)
+            self.result_text.insert(tk.END, f"\nAttacker Moves Reduced: {original_n_attacker} → {simplified_n}\n", "item")
+        elif player == "defender":
+            simplified_n = len(defender_moves)
+            self.result_text.insert(tk.END, f"\nDefender Moves Reduced: {original_n_defender} → {simplified_n}\n", "item")
         
     def update_inputs(self):
         old_attacker_moves = [entry.get() for entry in self.attacker_entries] if self.attacker_entries else []
