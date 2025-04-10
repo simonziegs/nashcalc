@@ -4,6 +4,13 @@ import numpy as np
 from scipy.optimize import linprog
 import json
 import os
+from dotenv import load_dotenv
+
+# Load variables from .env
+load_dotenv()
+
+# Access file path
+personal_path = os.getenv("FILE_PATH")
 
 class NashCalculatorGUI:
     def __init__(self, root):
@@ -95,7 +102,7 @@ class NashCalculatorGUI:
         self.result_frame.rowconfigure(1, weight=1)
 
     def compare_existing_scenarios(self):
-        scenario_dir = "E:/Simon/Documents"  # Your main directory
+        scenario_dir = personal_path
         if not os.path.exists(scenario_dir):
             messagebox.showinfo("Info", f"Scenario directory '{scenario_dir}' not found.")
             return
