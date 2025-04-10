@@ -17,6 +17,8 @@ A graphical user interface (GUI) tool built with Python to calculate Nash Equili
 
 - Binary Conversion: Convert payoff values to a ternary system (-1, 0, 1) based on a threshold (±1000).
 
+- Simplify attack/defense strategies while keeping a desired percentage of EV.
+
 - Interactive GUI: Built with tkinter for an intuitive user experience.
 
 ## Prerequisites
