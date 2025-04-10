@@ -40,7 +40,12 @@ git clone https://github.com/simonziegs/nashcalc.git
 ```
 pip install tkinter numpy scipy
 ```
-***3. Run the Application:***
+***3. Create a .env file in the project root and set your file path, otherwise Compare EVs feature will not work:***
+```
+# .env
+FILE_PATH=/full/path/to/your/file.txt
+```
+***4. Run the Application:***
 ```
 python nashcalc.py
 ```
