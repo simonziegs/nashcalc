@@ -42,7 +42,7 @@ pip install tkinter numpy scipy
 ```
 ***3. Run the Application:***
 ```
-python nashcalc_v1.py
+python nashcalc.py
 ```
 ## Usage
 Set Moves:
