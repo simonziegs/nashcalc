@@ -42,12 +42,20 @@ class NashCalculatorGUI:
         
         self.matrix_frame = ttk.LabelFrame(self.input_frame, text="Payoff Matrix", padding="5")
         self.matrix_frame.grid(row=3, column=0, columnspan=2, pady=10, sticky="nsew")
+
         # Threshold spinbox
         ttk.Label(self.input_frame, text="Simplification Threshold (%):").grid(row=5, column=0, padx=5, pady=5)
         self.threshold_spinbox = tk.Spinbox(self.input_frame, from_=0, to=20, increment=1, width=5)
         self.threshold_spinbox.grid(row=5, column=1, padx=5, pady=5)
         self.threshold_spinbox.delete(0, tk.END)
         self.threshold_spinbox.insert(0, "10")  # Default to 10%
+
+        # Exploit spinbox
+        ttk.Label(self.input_frame, text="Exploit Weight:").grid(row=6, column=0, padx=5, pady=5)
+        self.exploit_spinbox = tk.Spinbox(self.input_frame, from_=0, to=1, increment=0.1, width=5)
+        self.exploit_spinbox.grid(row=6, column=1, padx=5, pady=5)
+        self.exploit_spinbox.delete(0, tk.END)
+        self.exploit_spinbox.insert(0, "0.5")  # Default to 10%
             
         button_frame = ttk.Frame(self.input_frame)
         button_frame.grid(row=4, column=0, columnspan=2, pady=10)
@@ -59,6 +67,7 @@ class NashCalculatorGUI:
         ttk.Button(button_frame, text="Make Binary", command=self.make_binary).grid(row=0, column=5, padx=5)
         ttk.Button(button_frame, text="Simplify Attacker", command=self.simplify_attacker_strategy).grid(row=0, column=6, padx=5)
         ttk.Button(button_frame, text="Simplify Defender", command=self.simplify_defender_strategy).grid(row=0, column=7, padx=5)
+        ttk.Button(button_frame, text="Compare EVs", command=self.compare_existing_scenarios).grid(row=0, column=8, padx=5)
         
         self.attacker_entries = []
         self.defender_entries = []
@@ -84,6 +93,105 @@ class NashCalculatorGUI:
         
         self.result_frame.columnconfigure(0, weight=1)
         self.result_frame.rowconfigure(1, weight=1)
+
+    def compare_existing_scenarios(self):
+        scenario_dir = "E:/Simon/Documents"  # Your main directory
+        if not os.path.exists(scenario_dir):
+            messagebox.showinfo("Info", f"Scenario directory '{scenario_dir}' not found.")
+            return
+        
+        # Collect all .json files from subfolders
+        scenario_files = []
+        for root, _, files in os.walk(scenario_dir):
+            for file in files:
+                if file.endswith('.json'):
+                    full_path = os.path.join(root, file)
+                    relative_path = os.path.relpath(full_path, scenario_dir)
+                    scenario_files.append((relative_path, full_path))
+        
+        if not scenario_files:
+            messagebox.showinfo("Info", f"No saved scenarios found in '{scenario_dir}' or its subfolders.")
+            return
+        
+        compare_window = tk.Toplevel(self.root)
+        compare_window.title("Compare Scenario EVs")
+        
+        tree = ttk.Treeview(compare_window, columns=("Name", "EV"), show="headings")
+        tree.heading("Name", text="Scenario Name")
+        tree.heading("EV", text="Expected Value")
+        
+        # List to store scenario data for sorting
+        scenario_data = []
+        
+        # Process each scenario file
+        for rel_path, full_path in scenario_files:
+            try:
+                with open(full_path, 'r') as f:
+                    scenario = json.load(f)
+                attacker_moves = scenario["attacker_moves"]
+                defender_moves = scenario["defender_moves"]
+                payoffs = [float(p) for p in scenario["payoffs"]]
+                payoff_matrix = np.array(payoffs).reshape(scenario["n_attacker"], scenario["n_defender"])
+                result = self.calculate_mixed_nash(attacker_moves, defender_moves, payoff_matrix)
+                ev = result[4] if not isinstance(result, str) else float('-inf')  # Use -inf for errors to sort them last
+                scenario_data.append((rel_path[:-5], ev, full_path))
+            except Exception as e:
+                scenario_data.append((rel_path[:-5], float('-inf'), full_path))  # Errors get -inf
+        
+        # Sort by EV in descending order (highest first)
+        scenario_data.sort(key=lambda x: x[1], reverse=True)
+        
+        # Populate the sorted table
+        for name, ev, _ in scenario_data:
+            ev_display = f"{ev:.4f}" if ev != float('-inf') else "Error"
+            tree.insert("", "end", values=(name, ev_display))
+        
+        tree.pack(fill="both", expand=True)
+        
+        button_frame = ttk.Frame(compare_window)
+        button_frame.pack(pady=10)
+        
+        def load_selected():
+            selected = tree.selection()
+            if selected:
+                rel_name = tree.item(selected[0])["values"][0]
+                # Find the full path from scenario_data
+                full_path = next(item[2] for item in scenario_data if item[0] == rel_name)
+                self.load_scenario_from_file(full_path)
+                compare_window.destroy()
+        
+        ttk.Button(button_frame, text="Load Selected", command=load_selected).grid(row=0, column=0, padx=5)
+        ttk.Button(button_frame, text="Close", command=compare_window.destroy).grid(row=0, column=1, padx=5)
+
+    def load_scenario_from_file(self, file_path):
+        try:
+            if file_path and os.path.exists(file_path):
+                with open(file_path, 'r') as f:
+                    scenario = json.load(f)
+                
+                # Update move counts
+                self.attacker_count.delete(0, tk.END)
+                self.attacker_count.insert(0, scenario["n_attacker"])
+                self.defender_count.delete(0, tk.END)
+                self.defender_count.insert(0, scenario["n_defender"])
+                
+                # Recreate input fields (this will clear existing entries)
+                self.update_inputs()
+                
+                # Populate move names and payoffs
+                for i, move in enumerate(scenario["attacker_moves"]):
+                    self.attacker_entries[i].delete(0, tk.END)
+                    self.attacker_entries[i].insert(0, move)
+                for j, move in enumerate(scenario["defender_moves"]):
+                    self.defender_entries[j].delete(0, tk.END)
+                    self.defender_entries[j].insert(0, move)
+                for k, payoff in enumerate(scenario["payoffs"]):
+                    self.payoff_entries[k].delete(0, tk.END)
+                    self.payoff_entries[k].insert(0, str(payoff))
+                
+                messagebox.showinfo("Success", "Scenario loaded successfully!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load scenario: {str(e)}")
 
     def compute_nash_for_subset(self, payoff_matrix, attacker_subset=None, defender_subset=None):
         """Compute Nash equilibrium for a subset of attacker and/or defender moves."""
@@ -590,8 +698,8 @@ class NashCalculatorGUI:
                     raise ValueError("Cannot compute pure best response")
                 pure_attacker_probs = pure_result[2]
                 
+                exploit_weight = float(self.exploit_spinbox.get())
                 dominant_idx = np.argmax(pure_attacker_probs)
-                exploit_weight = 0.5
                 subtle_attacker_probs = np.array(nash_attacker_probs_opt) * (1 - exploit_weight)
                 subtle_attacker_probs[dominant_idx] += exploit_weight
                 subtle_game_value = np.dot(subtle_attacker_probs, np.dot(payoff_matrix, defender_probs))

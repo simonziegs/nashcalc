@@ -13,6 +13,8 @@ A graphical user interface (GUI) tool built with Python to calculate Nash Equili
 
 - Save/Load Scenarios: Export and import game scenarios as JSON files.
 
+- Compare EVs from different Scenarios
+
 - Binary Conversion: Convert payoff values to a ternary system (-1, 0, 1) based on a threshold (±1000).
 
 - Interactive GUI: Built with tkinter for an intuitive user experience.
