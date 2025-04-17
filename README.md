@@ -38,7 +38,7 @@ git clone https://github.com/simonziegs/nashcalc.git
 ```
 ***2. Install Dependencies:***
 ```
-pip install tkinter numpy scipy
+pip install -r requirements.txt
 ```
 ***3. Create a .env file in the project root and set your file path, otherwise Compare EVs feature will not work:***
 ```
