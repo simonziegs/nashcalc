@@ -13,7 +13,7 @@ A graphical user interface (GUI) tool built with Python to calculate Nash Equili
 
 - Save/Load Scenarios: Export and import game scenarios as JSON files.
 
-- Compare EVs from different Scenarios
+- Option to set locked strategies according to QRE (Probability of chosen moves based on their payoff, introduces some randomness based on Lambda paramter)
 
 - Binary Conversion: Convert payoff values to a ternary system (-1, 0, 1) based on a threshold (±1000).
 
@@ -25,7 +25,6 @@ A graphical user interface (GUI) tool built with Python to calculate Nash Equili
 - Python 3.6+
 
 - Required Libraries:
-  - tkinter
 
   - numpy
 
@@ -38,20 +37,15 @@ git clone https://github.com/simonziegs/nashcalc.git
 ```
 ***2. Install Dependencies:***
 ```
-pip install tkinter numpy scipy
+python -m pip install -r requirements.txt
 ```
-***3. Create a .env file in the project root and set your file path, otherwise Compare EVs feature will not work:***
+***3. Run the Application:***
 ```
-# .env
-FILE_PATH=/full/path/to/your/file.txt
-```
-***4. Run the Application:***
-```
-python nashcalc.py
+python main.py
 ```
 ## Usage
 Set Moves:
-- Use the spin boxes to define the number of attacker and defender moves (maximum 15).
+- Add/remove moves.
 
 - Edit move names in the "Move Names" section.
 
@@ -61,7 +55,9 @@ Input Payoff Matrix:
 - Positive values favor the attacker, negative values favor the defender.
 
 Lock Probabilities (Optional):
-- Check the "Lock?" box next to a move and enter a probability (0-100%) to fix it for best response or subtle exploit calculations.
+- Check the "Lock" box and enter a probability (0-100%) to fix it for best response or subtle exploit calculations.
+
+- Alternatively use QRE to set it automatically (Lambda values from 0.1 to 20, the bigger the closer to nash, the lower the more random)
 
 Calculate Strategies:
 - Calculate Nash: Computes the mixed-strategy Nash Equilibrium.
