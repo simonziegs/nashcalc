@@ -85,7 +85,7 @@ class NashCalculatorGUI:
         self.exploit_spinbox.insert(0, "0.3")
 
         ttk.Label(self.input_frame, text="QRE Lambda:").grid(row=7, column=0, padx=5, pady=5, sticky="w")
-        self.lambda_spinbox = tk.Spinbox(self.input_frame, from_=0.1, to=10, increment=1, width=5)
+        self.lambda_spinbox = tk.Spinbox(self.input_frame, from_=0.1, to=20, increment=1, width=5)
         self.lambda_spinbox.grid(row=7, column=1, padx=5, pady=5, sticky="w")
         self.lambda_spinbox.delete(0, tk.END)
         self.lambda_spinbox.insert(0, "15.0")
